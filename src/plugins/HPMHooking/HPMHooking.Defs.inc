@@ -1232,8 +1232,8 @@ typedef void (*HPMHOOK_pre_clif_pvpset) (struct map_session_data **sd, int *pvpr
 typedef void (*HPMHOOK_post_clif_pvpset) (struct map_session_data *sd, int pvprank, int pvpnum, int type);
 typedef void (*HPMHOOK_pre_clif_map_property_mapall) (int *mapid, enum map_property *property);
 typedef void (*HPMHOOK_post_clif_map_property_mapall) (int mapid, enum map_property property);
-typedef void (*HPMHOOK_pre_clif_bossmapinfo) (int *fd, struct mob_data **md, short *flag);
-typedef void (*HPMHOOK_post_clif_bossmapinfo) (int fd, struct mob_data *md, short flag);
+typedef void (*HPMHOOK_pre_clif_bossmapinfo) (int *fd, struct mob_data **md, enum bossmap_info_type *flag);
+typedef void (*HPMHOOK_post_clif_bossmapinfo) (int fd, struct mob_data *md, enum bossmap_info_type flag);
 typedef void (*HPMHOOK_pre_clif_map_type) (struct map_session_data **sd, enum map_type *type);
 typedef void (*HPMHOOK_post_clif_map_type) (struct map_session_data *sd, enum map_type type);
 typedef void (*HPMHOOK_pre_clif_maptypeproperty2) (struct block_list **bl, enum send_target *t);
@@ -7828,6 +7828,8 @@ typedef int (*HPMHOOK_pre_skill_count_wos) (struct block_list **bl, va_list ap);
 typedef int (*HPMHOOK_post_skill_count_wos) (int retVal___, struct block_list *bl, va_list ap);
 typedef int (*HPMHOOK_pre_skill_get_linked_song_dance_id) (int *skill_id);
 typedef int (*HPMHOOK_post_skill_get_linked_song_dance_id) (int retVal___, int skill_id);
+typedef void (*HPMHOOK_pre_skill_add_bard_dancer_soullink_songs) (struct map_session_data **sd);
+typedef void (*HPMHOOK_post_skill_add_bard_dancer_soullink_songs) (struct map_session_data *sd);
 #endif // MAP_SKILL_H
 #ifdef COMMON_SOCKET_H /* sockt */
 typedef void (*HPMHOOK_pre_sockt_init) (void);
