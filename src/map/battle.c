@@ -1659,6 +1659,8 @@ static int battle_calc_skillratio(int attack_type, struct block_list *src, struc
 #ifdef RENEWAL
 				case NJ_HYOUSENSOU:
 					skillratio -= 30;
+					if (sc != NULL && sc->data[SC_NJ_SUITON] != NULL)
+						skillratio += 2 * skill_lv;
 					if (sd && sd->charm_type == CHARM_TYPE_WATER && sd->charm_count > 0)
 						skillratio += 5 * sd->charm_count;
 					break;
@@ -3370,9 +3372,9 @@ static int64 battle_calc_damage(struct block_list *src, struct block_list *bl, s
 	if( bl->type == BL_MOB && !status->isdead(bl) && src != bl) {
 		struct mob_data *md = BL_UCAST(BL_MOB, bl);
 		if (damage > 0)
-			mob->skill_event(md, src, timer->gettick(), flag);
+			mob->use_skill_event(md, src, timer->gettick(), flag);
 		if (skill_id)
-			mob->skill_event(md, src, timer->gettick(), MSC_SKILLUSED|(skill_id<<16));
+			mob->use_skill_event(md, src, timer->gettick(), MSC_SKILLUSED | (skill_id << 16));
 	}
 	if (t_sd && pc_ismadogear(t_sd) && rnd()%100 < 50) {
 		int element = -1;

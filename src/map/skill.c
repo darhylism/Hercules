@@ -859,7 +859,7 @@ static int skill_get_type(int skill_id, int skill_lv)
  *
  * @param skill_id The skill's ID.
  * @param skill_lv The skill's level.
- * @param flag 
+ * @param flag
  * @return The skill's unit ID corresponding to the passed level. Defaults to 0 in case of error.
  *
  **/
@@ -6008,17 +6008,14 @@ static int skill_castend_id(int tid, int64 tick, int id, intptr_t data)
 			case WE_CALLPARENT:
 			case WE_CALLBABY:
 			case AM_RESURRECTHOMUN:
-			case PF_SPIDERWEB:
 				//Find a random spot to place the skill. [Skotlex]
 				inf2 = skill->get_splash(ud->skill_id, ud->skill_lv);
-				ud->skillx = target->x + inf2;
-				ud->skilly = target->y + inf2;
-				if (inf2 && !map->random_dir(target, &ud->skillx, &ud->skilly)) {
-					ud->skillx = target->x;
-					ud->skilly = target->y;
-				}
+				ud->skillx = target->x;
+				ud->skilly = target->y;
+				map->get_random_cell(target, target->m, &ud->skillx, &ud->skilly, 1, inf2);
 				ud->skilltimer=tid;
 				return skill->castend_pos(tid,tick,id,data);
+			case PF_SPIDERWEB:
 			case GN_WALLOFTHORN:
 			case SU_CN_POWDERING:
 			case SU_SV_ROOTTWIST:
@@ -10877,12 +10874,12 @@ static int skill_castend_nodamage_id(struct block_list *src, struct block_list *
 
 				if (unit->movepos(src, bl->x, bl->y, 0, 0)) {
 					clif->skill_nodamage(src, src, skill_id, skill_lv, 1);
-					clif->slide(src, bl->x, bl->y) ;
+					clif->blown(src);
 					sc_start(src, src, SC_CONFUSION, 25, skill_lv, skill->get_time(skill_id, skill_lv));
-					if ( !is_boss(bl) && unit->stop_walking(&sd->bl, STOPWALKING_FLAG_FIXPOS) && unit->movepos(bl, x, y, 0, 0) ) {
-						if( dstsd && pc_issit(dstsd) )
+					if (!is_boss(bl) && unit->movepos(bl, x, y, 0, 0) != 0) {
+						if (dstsd != NULL && pc_issit(dstsd))
 							pc->setstand(dstsd);
-						clif->slide(bl, x, y) ;
+						clif->blown(bl);
 						sc_start(src, bl, SC_CONFUSION, 75, skill_lv, skill->get_time(skill_id, skill_lv));
 					}
 				}
@@ -11038,7 +11035,7 @@ static int skill_castend_nodamage_id(struct block_list *src, struct block_list *
 
 	if (dstmd) { //Mob skill event for no damage skills (damage ones are handled in battle_calc_damage) [Skotlex]
 		mob->log_damage(dstmd, src, 0); //Log interaction (counts as 'attacker' for the exp bonus)
-		mob->skill_event(dstmd, src, tick, MSC_SKILLUSED|(skill_id<<16));
+		mob->use_skill_event(dstmd, src, tick, MSC_SKILLUSED | (skill_id << 16));
 	}
 
 	if( sd && !(flag&1) ) { // ensure that the skill last-cast tick is recorded
@@ -11237,7 +11234,7 @@ static int skill_castend_pos(int tid, int64 tick, int id, intptr_t data)
 
 	if (sd == NULL || sd->auto_cast_current.skill_id != ud->skill_id || skill->get_delay(ud->skill_id, ud->skill_lv) != 0)
 		ud->canact_tick = tick;
-	
+
 	if (sd != NULL && ud->skill_id == sd->auto_cast_current.skill_id)
 		pc->autocast_remove(sd, sd->auto_cast_current.type, ud->skill_id, ud->skill_lv);
 	else if(md)
@@ -13998,7 +13995,7 @@ static int skill_unit_onplace_timer(struct skill_unit *src, struct block_list *b
 	}
 
 	if (bl->type == BL_MOB && ss != bl)
-		mob->skill_event(BL_UCAST(BL_MOB, bl), ss, tick, MSC_SKILLUSED|(skill_id<<16));
+		mob->use_skill_event(BL_UCAST(BL_MOB, bl), ss, tick, MSC_SKILLUSED | (skill_id << 16));
 
 	return skill_id;
 }

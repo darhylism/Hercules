@@ -1166,7 +1166,7 @@ static int mob_spawn(struct mob_data *md)
 	if( map->list[md->bl.m].users )
 		clif->spawn(&md->bl);
 	skill->unit_move(&md->bl,tick,1);
-	mob->skill_use(md, tick, MSC_SPAWN);
+	mob->use_skill(md, tick, MSC_SPAWN);
 	return 0;
 }
 
@@ -1464,7 +1464,7 @@ static int mob_ai_sub_hard_slavemob(struct mob_data *md, int64 tick)
 			mob_stop_attack(md);
 			const struct mob_data *m_md = BL_CCAST(BL_MOB, bl); // Can be NULL due to master being BL_PC
 			// If master is BL_MOB and in battle, lock & chase to master's target instead, unless configured not to.
-			if ((battle_config.slave_chase_masters_chasetarget == 0 || (m_md != NULL && !mob->is_in_battle_state(m_md)))
+			if ((bl->type == BL_PC || battle_config.slave_chase_masters_chasetarget == 0 || (m_md != NULL && !mob->is_in_battle_state(m_md)))
 			    && map->search_freecell(&md->bl, bl->m, &x, &y, MOB_SLAVEDISTANCE, MOB_SLAVEDISTANCE, 1)
 			    && unit->walk_toxy(&md->bl, x, y, 0) == 0)
 				return 1;
@@ -1523,7 +1523,7 @@ static int mob_unlocktarget(struct mob_data *md, int64 tick)
 		FALLTHROUGH
 	case MSS_IDLE:
 		// Idle skill.
-		if ((++md->ud.walk_count % IDLE_SKILL_INTERVAL) == 0 && mob->skill_use(md, tick, -1) == 0)
+		if ((++md->ud.walk_count % IDLE_SKILL_INTERVAL) == 0 && mob->use_skill(md, tick, -1) == 0)
 			break;
 		//Random walk.
 		if (!md->master_id &&
@@ -1703,7 +1703,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 			    || !mob->can_reach(md, tbl, md->min_chase, MSS_RUSH)
 			    )
 			 && md->state.attacked_count++ >= RUDE_ATTACKED_COUNT
-			 && mob->skill_use(md, tick, MSC_RUDEATTACKED) == 0 // If can't rude Attack
+			 && mob->use_skill(md, tick, MSC_RUDEATTACKED) != 0 // If can't rude Attack
 			 && can_move && unit->escape(&md->bl, tbl, rnd()%10 +1) // Attempt escape
 			) {
 				//Escaped
@@ -1731,7 +1731,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 			) {
 				// Rude attacked
 				if (md->state.attacked_count++ >= RUDE_ATTACKED_COUNT
-				 && mob->skill_use(md, tick, MSC_RUDEATTACKED) == 0 && can_move != 0
+				 && mob->use_skill(md, tick, MSC_RUDEATTACKED) != 0 && can_move != 0
 				 && !tbl && unit->escape(&md->bl, abl, rnd()%10 +1)
 				) {
 					//Escaped.
@@ -1876,7 +1876,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 	if(md->ud.walktimer == INVALID_TIMER && (md->state.skillstate == MSS_BERSERK || md->state.skillstate == MSS_ANGRY)) {
 		if (DIFF_TICK(md->ud.canmove_tick, tick) <= MIN_MOBTHINKTIME && DIFF_TICK(md->ud.canact_tick, tick) < -MIN_MOBTHINKTIME*IDLE_SKILL_INTERVAL)
 		{ //Only use skill if able to walk on next tick and not used a skill the last second
-			mob->skill_use(md, tick, -1);
+			mob->use_skill(md, tick, -1);
 		}
 	}
 
@@ -2005,7 +2005,7 @@ static int mob_ai_sub_lazy(struct mob_data *md, va_list args)
 		//Because it is not unset when the mob finishes walking.
 		md->state.skillstate = MSS_IDLE;
 		if( rnd()%1000 < MOB_LAZYSKILLPERC(md) ) //Chance to do a mob's idle skill.
-			mob->skill_use(md, tick, -1);
+			mob->use_skill(md, tick, -1);
 	}
 
 	return 0;
@@ -2435,7 +2435,7 @@ static int mob_dead(struct mob_data *md, struct block_list *src, int type)
 	if( src )
 	{ // Use Dead skill only if not killed by Script or Command
 		md->state.skillstate = MSS_DEAD;
-		mob->skill_use(md,tick,-1);
+		mob->use_skill(md, tick, -1);
 	}
 
 	map->freeblock_lock();
@@ -2975,7 +2975,7 @@ static void mob_revive(struct mob_data *md, unsigned int hp)
 		map->addblock(&md->bl);
 	clif->spawn(&md->bl);
 	skill->unit_move(&md->bl,tick,1);
-	mob->skill_use(md, tick, MSC_SPAWN);
+	mob->use_skill(md, tick, MSC_SPAWN);
 	if (battle_config.show_mob_info&3)
 		clif->blname_ack(0, &md->bl);
 }
@@ -3464,7 +3464,7 @@ static struct block_list *mob_getfriendstatus(struct mob_data *md, int cond1, in
 }
 
 /**
- * Checks if skill cast condition in fulfilled and executes the skill in case of success.
+ * Checks if skill cast condition is fulfilled and executes the skill in case of success.
  *
  * @param md The monster which tries to cast a skill.
  * @param tick The timestamp of skill execution.
@@ -3472,13 +3472,13 @@ static struct block_list *mob_getfriendstatus(struct mob_data *md, int cond1, in
  * @return 0 on success, 1 on failure.
  *
  **/
-static int mob_skill_use(struct mob_data *md, int64 tick, int event)
+static int mob_use_skill(struct mob_data *md, int64 tick, int event)
 {
-	nullpo_ret(md);
+	nullpo_retr(1, md);
 
 	struct mob_skill *ms = md->db->skill;
 
-	nullpo_ret(ms);
+	nullpo_retr(1, ms);
 
 	if (battle_config.mob_skill_rate == 0 || md->ud.skilltimer != INVALID_TIMER || md->db->maxskill == 0)
 		return 1;
@@ -3733,34 +3733,36 @@ static int mob_skill_use(struct mob_data *md, int64 tick, int event)
 /*==========================================
  * Skill use event processing
  *------------------------------------------*/
-static int mobskill_event(struct mob_data *md, struct block_list *src, int64 tick, int flag)
+static int mob_use_skill_event(struct mob_data *md, struct block_list *src, int64 tick, int flag)
 {
-	int target_id, res = 0;
+	int target_id;
 
-	nullpo_ret(md);
-	nullpo_ret(src);
+	nullpo_retr(1, md);
+	nullpo_retr(1, src);
 	if(md->bl.prev == NULL || md->status.hp <= 0)
 		return 1;
 
 	if (md->special_state.ai == AI_SPHERE) {//LOne WOlf explained that ANYONE can trigger the marine countdown skill. [Skotlex]
 		md->state.alchemist = 1;
-		return mob->skill_use(md, timer->gettick(), MSC_ALCHEMIST);
+		return mob->use_skill(md, timer->gettick(), MSC_ALCHEMIST);
 	}
 
 	target_id = md->target_id;
 	if (!target_id || battle_config.mob_changetarget_byskill)
 		md->target_id = src->id;
 
+	int res = 1;
+
 	if (flag == -1)
-		res = mob->skill_use(md, tick, MSC_CASTTARGETED);
+		res = mob->use_skill(md, tick, MSC_CASTTARGETED);
 	else if ((flag&0xffff) == MSC_SKILLUSED)
-		res = mob->skill_use(md, tick, flag);
+		res = mob->use_skill(md, tick, flag);
 	else if (flag&BF_SHORT)
-		res = mob->skill_use(md, tick, MSC_CLOSEDATTACKED);
+		res = mob->use_skill(md, tick, MSC_CLOSEDATTACKED);
 	else if (flag&BF_LONG && !(flag&BF_MAGIC)) //Long-attacked should not include magic.
-		res = mob->skill_use(md, tick, MSC_LONGRANGEATTACKED);
+		res = mob->use_skill(md, tick, MSC_LONGRANGEATTACKED);
 	else if ((flag & BF_MAGIC) != 0)
-		res = mob->skill_use(md, tick, MSC_MAGICATTACKED);
+		res = mob->use_skill(md, tick, MSC_MAGICATTACKED);
 
 	if (res != 0)
 	//Restore previous target only if skill condition failed to trigger. [Skotlex]
@@ -5585,9 +5587,10 @@ static bool mob_skill_db_libconfig_sub_skill(struct config_setting_t *it, int n,
 	int skill_id = 0;
 	const char *name = config_setting_name(it);
 	const char *mob_str = (mob_id < 0) ? "global ID" : "monster";
+	const char *mob_sprite = (mob_id > 0) ? mob->db(mob_id)->sprite : "";
 
 	if ((skill_id = skill->name2id(name)) == 0) {
-		ShowWarning("%s: Non existant skill %d in %s %d, skipping.\n", __func__, skill_id, mob_str, mob_id);
+		ShowWarning("%s: Non existant skill %s in %s %s (%d), skipping.\n", __func__, name, mob_str, mob_sprite, mob_id);
 		return false;
 	}
 
@@ -5619,7 +5622,7 @@ static bool mob_skill_db_libconfig_sub_skill(struct config_setting_t *it, int n,
 		ARR_FIND(0, MAX_MOBSKILL, idx, (ms = &mob->db_data[mob_id]->skill[idx])->skill_id == 0);
 
 		if (idx == MAX_MOBSKILL) {
-			ShowError("%s: Too many skills for monster %d, skipping.\n", __func__, mob_id);
+			ShowError("%s: Too many skills for monster %s (%d), skipping.\n", __func__, mob_sprite, mob_id);
 			return false;
 		}
 
@@ -5630,8 +5633,8 @@ static bool mob_skill_db_libconfig_sub_skill(struct config_setting_t *it, int n,
 
 	int i32 = MSS_ANY;
 	if (mob->lookup_const(it, "SkillState", &i32) && (i32 < MSS_ANY || i32 > MSS_ANYTARGET)) {
-		ShowWarning("%s: Invalid skill state %d for skill %d (%s) in %s %d, defaulting to MSS_ANY.\n",
-			    __func__, i32, skill_id, skill_name, mob_str, mob_id);
+		ShowWarning("%s: Invalid skill state %d for skill %d (%s) in %s %s (%d), defaulting to MSS_ANY.\n",
+			    __func__, i32, skill_id, skill_name, mob_str, mob_sprite, mob_id);
 		i32 = MSS_ANY;
 	}
 	ms->state = i32;
@@ -5668,23 +5671,23 @@ static bool mob_skill_db_libconfig_sub_skill(struct config_setting_t *it, int n,
 
 	i32 = MST_TARGET;
 	if (mob->lookup_const(it, "SkillTarget", &i32) && (i32 < MST_TARGET || i32 > MST_AROUND)) {
-		ShowWarning("%s: Invalid skill target %d for skill %d (%s) in %s %d, defaulting to MST_TARGET.\n",
-			    __func__, i32, skill_id, skill_name, mob_str, mob_id);
+		ShowWarning("%s: Invalid skill target %d for skill %d (%s) in %s %s (%d), defaulting to MST_TARGET.\n",
+			    __func__, i32, skill_id, skill_name, mob_str, mob_sprite, mob_id);
 		i32 = MST_TARGET;
 	}
 	ms->target = i32;
 
 	// Check the target condition for non-ground skills. (Ground skills can use every target.)
 	if (skill->get_casttype2(skill->get_index(skill_id)) != CAST_GROUND && ms->target > MST_MASTER) {
-		ShowWarning("%s: Wrong skill target %d for non-ground skill %d (%s) in %s %d, defaulting to MST_TARGET.\n",
-			    __func__, ms->target, skill_id, skill_name, mob_str, mob_id);
+		ShowWarning("%s: Wrong skill target %d for non-ground skill %d (%s) in %s %s (%d), defaulting to MST_TARGET.\n",
+			    __func__, ms->target, skill_id, skill_name, mob_str, mob_sprite, mob_id);
 		ms->target = MST_TARGET;
 	}
 
 	i32 = MSC_ALWAYS;
 	if (mob->lookup_const(it, "CastCondition", &i32) && (i32 < MSC_ALWAYS || i32 > MSC_MAGICATTACKED)) {
-		ShowWarning("%s: Invalid skill condition %d for skill id %d (%s) in %s %d, defaulting to MSC_ALWAYS.\n",
-			    __func__, i32, skill_id, skill_name, mob_str, mob_id);
+		ShowWarning("%s: Invalid skill condition %d for skill id %d (%s) in %s %s (%d), defaulting to MSC_ALWAYS.\n",
+			    __func__, i32, skill_id, skill_name, mob_str, mob_sprite, mob_id);
 		i32 = MSC_ALWAYS;
 	}
 	ms->cond1 = i32;
@@ -5724,8 +5727,8 @@ static bool mob_skill_db_libconfig_sub_skill(struct config_setting_t *it, int n,
 
 	if (libconfig->setting_lookup_int(it, "ChatMsgID", &i32) == CONFIG_TRUE) {
 		if (i32 <= 0 || i32 > MAX_MOB_CHAT || mob->chat_db[i32] == NULL) {
-			ShowWarning("%s: Invalid message ID %d for skill %d (%s) in %s %d, ignoring.\n",
-				    __func__, i32, skill_id, skill_name, mob_str, mob_id);
+			ShowWarning("%s: Invalid message ID %d for skill %d (%s) in %s %s (%d), ignoring.\n",
+				    __func__, i32, skill_id, skill_name, mob_str, mob_sprite, mob_id);
 		} else {
 			ms->msg_id = i32;
 		}
@@ -6159,8 +6162,8 @@ void mob_defaults(void)
 	mob->getmasterhpltmaxrate = mob_getmasterhpltmaxrate;
 	mob->getfriendstatus_sub = mob_getfriendstatus_sub;
 	mob->getfriendstatus = mob_getfriendstatus;
-	mob->skill_use = mob_skill_use;
-	mob->skill_event = mobskill_event;
+	mob->use_skill = mob_use_skill;
+	mob->use_skill_event = mob_use_skill_event;
 	mob->is_clone = mob_is_clone;
 	mob->clone_spawn = mob_clone_spawn;
 	mob->clone_delete = mob_clone_delete;
