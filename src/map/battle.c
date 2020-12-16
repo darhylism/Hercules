@@ -3274,7 +3274,7 @@ static int64 battle_calc_damage(struct block_list *src, struct block_list *bl, s
 		if( (sce = sc->data[SC_LIGHTNINGWALK]) && flag&BF_LONG && rnd()%100 < sce->val1 ) {
 			enum unit_dir dir = map->calc_dir(bl, src->x, src->y);
 			Assert_ret(dir >= UNIT_DIR_FIRST && dir < UNIT_DIR_MAX);
-			if (unit->movepos(bl, src->x - dirx[dir], src->y - diry[dir], 1, 1)) {
+			if (unit->move_pos(bl, src->x - dirx[dir], src->y - diry[dir], 1, true) == 0) {
 				clif->slide(bl, src->x - dirx[dir], src->y - diry[dir]);
 				unit->set_dir(bl, dir);
 			}
@@ -7441,7 +7441,7 @@ static const struct battle_data {
 	{ "mob_icewall_walk_block",             &battle_config.mob_icewall_walk_block,          75,     0,      255,            },
 	{ "boss_icewall_walk_block",            &battle_config.boss_icewall_walk_block,         0,      0,      255,            },
 	{ "features/roulette",                  &battle_config.feature_roulette,                1,      0,      1,              },
-	{ "show_monster_hp_bar",                &battle_config.show_monster_hp_bar,             1,      0,      1,              },
+	{ "show_monster_hp_bar",                &battle_config.show_monster_hp_bar,             1,      0,      1|2|4,          },
 	{ "fix_warp_hit_delay_abuse",           &battle_config.fix_warp_hit_delay_abuse,        0,      0,      1,              },
 	{ "costume_refine_def",                 &battle_config.costume_refine_def,              1,      0,      1,              },
 	{ "shadow_refine_def",                  &battle_config.shadow_refine_def,               1,      0,      1,              },

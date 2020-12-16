@@ -625,7 +625,7 @@ static int mob_once_spawn(struct map_session_data *sd, int16 m, int16 x, int16 y
 
 			if (gc != NULL) {
 				struct guild *g = guild->search(gc->guild_id);
-				
+
 				md->guardian_data = (struct guardian_data*)aCalloc(1, sizeof(struct guardian_data));
 				md->guardian_data->castle = gc;
 				md->guardian_data->number = MAX_GUARDIANS;
@@ -1626,7 +1626,7 @@ static int mob_warpchase(struct mob_data *md, struct block_list *target)
 	map->foreachinrange(mob->warpchase_sub, &md->bl,
 	                    md->db->range2, BL_NPC, target, &warp, &distance);
 
-	if (warp && unit->walktobl(&md->bl, &warp->bl, 1, 1))
+	if (warp != NULL && unit->walk_tobl(&md->bl, &warp->bl, 1, 1) == 0)
 		return 1;
 	return 0;
 }
@@ -1704,7 +1704,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 			    )
 			 && md->state.attacked_count++ >= RUDE_ATTACKED_COUNT
 			 && mob->use_skill(md, tick, MSC_RUDEATTACKED) != 0 // If can't rude Attack
-			 && can_move && unit->escape(&md->bl, tbl, rnd()%10 +1) // Attempt escape
+			 && can_move != 0 && unit->attempt_escape(&md->bl, tbl, rnd() % 10 + 1) == 0 // Attempt escape
 			) {
 				//Escaped
 				md->attacked_id = 0;
@@ -1732,7 +1732,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 				// Rude attacked
 				if (md->state.attacked_count++ >= RUDE_ATTACKED_COUNT
 				 && mob->use_skill(md, tick, MSC_RUDEATTACKED) != 0 && can_move != 0
-				 && !tbl && unit->escape(&md->bl, abl, rnd()%10 +1)
+				 && tbl == NULL && unit->attempt_escape(&md->bl, abl, rnd() % 10 + 1) == 0
 				) {
 					//Escaped.
 					//TODO: Maybe it shouldn't attempt to run if it has another, valid target?
@@ -1771,9 +1771,8 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 		return true;
 
 	// Scan area for targets
-	if (!tbl && mode&MD_LOOTER && md->lootitem && DIFF_TICK(tick, md->ud.canact_tick) > 0
-	 && (md->lootitem_count < LOOTITEM_SIZE || battle_config.monster_loot_type != 1)
-	) {
+	if (battle_config.monster_loot_type != 1 && tbl == NULL && (mode & MD_LOOTER) != 0x0 && md->lootitem != NULL
+	    && DIFF_TICK(tick, md->ud.canact_tick) > 0 && md->lootitem_count < LOOTITEM_SIZE) {
 		// Scan area for items to loot, avoid trying to loot if the mob is full and can't consume the items.
 		map->foreachinrange (mob->ai_sub_hard_lootsearch, &md->bl, view_range, BL_ITEM, md, &tbl);
 	}
@@ -1796,7 +1795,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 				return true;/* we are already moving */
 			map->foreachinrange (mob->ai_sub_hard_bg_ally, &md->bl, view_range, BL_PC, md, &tbl, mode);
 			if( tbl ) {
-				if( distance_blxy(&md->bl, tbl->x, tbl->y) <= 3 || unit->walktobl(&md->bl, tbl, 1, 1) )
+				if (distance_blxy(&md->bl, tbl->x, tbl->y) <= 3 || unit->walk_tobl(&md->bl, tbl, 1, 1) == 0)
 					return true;/* we're moving or close enough don't unlock the target. */
 			}
 		}
@@ -1827,7 +1826,7 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 			if (!can_move) //Stuck. Wait before walking.
 				return true;
 			md->state.skillstate = MSS_LOOT;
-			if (!unit->walktobl(&md->bl, tbl, 1, 1))
+			if (unit->walk_tobl(&md->bl, tbl, 1, 1) != 0)
 				mob->unlocktarget(md, tick); //Can't loot...
 			return true;
 		}
@@ -1908,8 +1907,8 @@ static bool mob_ai_sub_hard(struct mob_data *md, int64 tick)
 
 	//Follow up if possible.
 	//Hint: Chase skills are handled in the walktobl routine
-	if(!mob->can_reach(md, tbl, md->min_chase, MSS_RUSH) ||
-		!unit->walktobl(&md->bl, tbl, md->status.rhw.range, 2))
+	if (mob->can_reach(md, tbl, md->min_chase, MSS_RUSH) == 0
+	    || unit->walk_tobl(&md->bl, tbl, md->status.rhw.range, 2) != 0)
 		mob->unlocktarget(md,tick);
 
 	return true;
@@ -2380,7 +2379,7 @@ static void mob_damage(struct mob_data *md, struct block_list *src, int damage)
 
 #if PACKETVER >= 20131223
 	// Resend ZC_NOTIFY_MOVEENTRY to Update the HP
-	if (battle_config.show_monster_hp_bar)
+	if (clif->show_monster_hp_bar(&md->bl))
 		clif->set_unit_walking(&md->bl, NULL, unit->bl2ud(&md->bl), AREA);
 #endif
 
@@ -3117,7 +3116,7 @@ static void mob_heal(struct mob_data *md, unsigned int heal)
 		clif->blname_ack(0, &md->bl);
 #if PACKETVER >= 20131223
 	// Resend ZC_NOTIFY_MOVEENTRY to Update the HP
-	if (battle_config.show_monster_hp_bar)
+	if (clif->show_monster_hp_bar(&md->bl))
 		clif->set_unit_walking(&md->bl, NULL, unit->bl2ud(&md->bl), AREA);
 #endif
 
